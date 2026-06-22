@@ -25,7 +25,7 @@ BLUE2 = (0, 100, 255)
 BLACK = (0,0,0)
 
 BLOCK_SIZE = 20
-SPEED = 17 #20
+SPEED = 40 #20
 
 class SnakeGameAi:
     def __init__(self, w=640, h=480):
@@ -55,7 +55,7 @@ class SnakeGameAi:
         self.frame_iteration = 0
         
     def play_step(self, action):
-        self.play_step += 1
+        self.frame_iteration += 1
 
         # 1. collect user input
         for event in pygame.event.get():
@@ -102,10 +102,10 @@ class SnakeGameAi:
             pt = self.head
 
         # hits boundary
-        if self.pt.x > self.w - BLOCK_SIZE or self.pt.x < 0 or self.pt.y > self.h - BLOCK_SIZE or self.pt.y < 0:
+        if pt.x > self.w - BLOCK_SIZE or pt.x < 0 or pt.y > self.h - BLOCK_SIZE or pt.y < 0:
             return True
         # hits itself
-        if self.pt in self.snake[1:]:
+        if pt in self.snake[1:]:
             return True
         
         return False

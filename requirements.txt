@@ -2,3 +2,4 @@ pygame
 matplotlib
 ipython
 numpy
+matplotlib
