@@ -42,7 +42,7 @@ BLUE1 = (0, 0, 255)
 BLUE2 = (0, 100, 255)
 BLACK = (0,0,0)
 
-BLOCK_SIZE = 40
+BLOCK_SIZE = 40 # for (32, 24) board
 SPEED = 60 #20
 
 class SnakeGameAi:
@@ -175,3 +175,10 @@ class SnakeGameAi:
             y -= BLOCK_SIZE
             
         self.head = Point(x, y)
+
+
+def get_idx(point):
+    # Helper function to convert point (in pixels) to matrix index
+    x_idx = int(point.x // BLOCK_SIZE)
+    y_idx = int(point.y // BLOCK_SIZE)
+    return x_idx, y_idx

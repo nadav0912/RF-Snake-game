@@ -4,16 +4,55 @@ import torch.optim as optim
 import torch.nn.functional as F
 import os
 
-class Linear_QNet(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+class Conv_QNet(nn.Module):
+    def __init__(self, input_shape, output_size):
+        """
+        input_shape: tuple of (Channels, Height, Width), e.g., (3, 32, 24)
+        output_size: int, number of actions (e.g., 3)
+        """
         super().__init__()
 
-        self.linear1 = nn.Linear(input_size, hidden_size)
-        self.linear2 = nn.Linear(hidden_size, output_size)
+        self.conv_layers = nn.Sequential(
+            nn.Conv2d(
+                in_channels=input_shape[0], # 3
+                out_channels=16,
+                kernel_size=3,
+                stride=1,
+                padding=1
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                in_channels=16, 
+                out_channels=32, 
+                kernel_size=3, 
+                stride=1, 
+                padding=1
+            ),
+            nn.ReLU()
+        )
+
+        # Run dummy input to find conv output tensor size
+        dummy_input = torch.zeros(1, *input_shape) # tensore with size (3, 32, 24)
+        flattened_size = self._get_conv_output(dummy_input)
+
+        self.linear_layers = nn.Sequential(
+            nn.Linear(flattened_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, output_size)
+        )
+
+    def _get_conv_output(self, x):
+        """Helper func to find conv output tensor size"""
+        x = self.conv_layers(x)
+        return int(torch.prod(torch.tensor(x.size())))
 
     def forward(self, x):
-        x = F.relu(self.linear1(x))
-        x = self.linear2(x)
+        x = self.conv_layers(x)
+        
+        # Flatten and keep the batches
+        x = x.view(x.size(0), -1) 
+        
+        x = self.linear_layers(x)
         return x
         
     def save(self, file_name='model.pth'):
@@ -45,7 +84,7 @@ class QTrainer:
         action = torch.tensor(action, dtype=torch.float)
         reward = torch.tensor(reward, dtype=torch.float)
 
-        if len(state.shape) == 1:
+        if len(state.shape) == 3:
             state = torch.unsqueeze(state, 0)
             next_state = torch.unsqueeze(next_state, 0)
             action = torch.unsqueeze(action, 0)
@@ -55,6 +94,9 @@ class QTrainer:
         # 1: pedicted Q values with current state
         pred = self.model(state)
 
+        # Predicted the reward on next state of every state
+        next_preds = self.model(next_state)
+
         target = pred.clone()
         for idx in range(len(done)):
             # If done, onlt set Q_new to R (current reward)
@@ -62,7 +104,7 @@ class QTrainer:
 
             # If not done set Q_new = r + y * max(next_prediced Q value)
             if not done[idx]:
-                Q_new = reward[idx] + self.gamma * torch.max(self.model(next_state[idx]))
+                Q_new = reward[idx] + self.gamma * torch.max(next_preds[idx])
 
             target[idx][torch.argmax(action).item()] = Q_new
 

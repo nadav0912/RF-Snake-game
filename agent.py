@@ -2,8 +2,8 @@ import torch
 import random
 import numpy as np
 from collections import deque
-from game import SnakeGameAi, Direction, Point
-from model import Linear_QNet, QTrainer
+from game import SnakeGameAi, Direction, Point, get_idx, BLOCK_SIZE
+from model import Conv_QNet, QTrainer
 from helper import plot
 
 MAX_MEMORY = 100_000 
@@ -17,55 +17,32 @@ class Agent:
         self.gamma = 0.9  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # create queue 
 
-        self.model = Linear_QNet(11, 256, 3)
+        self.model = Conv_QNet((3, 24, 32), 3)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def get_state(self, game: SnakeGameAi):
-        head = game.snake[0]
+        cols = int(game.w // BLOCK_SIZE)
+        rows = int(game.h // BLOCK_SIZE)
 
-        point_l = Point(head.x - 20, head.y)
-        point_r = Point(head.x + 20, head.y)
-        point_u = Point(head.x, head.y - 20)
-        point_d = Point(head.x, head.y + 20)
+        # Create state with 3 channels: 0 -> head, 1 -> snake body, 2 -> apple
+        state = np.zeros((3, rows, cols), dtype=int)
 
-        dir_l = game.direction == Direction.LEFT
-        dir_r = game.direction == Direction.RIGHT
-        dir_u = game.direction == Direction.UP
-        dir_d = game.direction == Direction.DOWN
+        # Set head in first channel
+        head_x, head_y = get_idx(game.snake[0])
+        if 0 <= head_x < cols and 0 <= head_y < rows:
+            state[0, head_y, head_x] = 1
 
-        state = [
-            # Danger straight
-            (dir_r and game.is_collision(point_r)) or
-            (dir_l and game.is_collision(point_l)) or
-            (dir_u and game.is_collision(point_u)) or
-            (dir_d and game.is_collision(point_d)),
+        # Set snake body channel
+        for point in game.snake[1:]:
+            bx, by = get_idx(point)
+            state[1, by, bx] = 1
 
-            # Danger right
-            (dir_u and game.is_collision(point_r)) or
-            (dir_d and game.is_collision(point_l)) or
-            (dir_l and game.is_collision(point_u)) or
-            (dir_r and game.is_collision(point_d)),
+        # Set 
+        food_x, food_y = get_idx(game.food)
+        if 0 <= food_x < cols and 0 <= food_y < rows:
+            state[2, food_y, food_x] = 1
 
-            # Danger left
-            (dir_d and game.is_collision(point_r)) or
-            (dir_u and game.is_collision(point_l)) or
-            (dir_r and game.is_collision(point_u)) or
-            (dir_l and game.is_collision(point_d)),
-
-            # Move direction
-            dir_l,
-            dir_r,
-            dir_u,
-            dir_d,
-
-            # Food location
-            game.food.x < game.head.x,  # food left
-            game.food.x > game.head.x,  # food right
-            game.food.y < game.head.y,  # food up
-            game.food.y > game.head.y  # food down
-        ]
-
-        return np.array(state, dtype=int) # convert to 0/1 values
+        return state
     
     def remember(self, state, action, reward, next_state, done):
         # Pop left if MAX_MEMORY is reached
@@ -94,6 +71,7 @@ class Agent:
             final_move[idx_move] = 1
         else:
             state0 = torch.tensor(state, dtype=torch.float)
+            state0 = torch.unsqueeze(state0, 0)
             prediction = self.model(state0)
             idx_move = torch.argmax(prediction).item()
             final_move[idx_move] = 1
