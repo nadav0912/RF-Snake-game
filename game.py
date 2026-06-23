@@ -1,3 +1,21 @@
+import ctypes
+import os
+
+# --- Windows DPI Fix (Must be at the very top of the file) ---
+try:
+    # Modern Windows 10/11 approach
+    ctypes.windll.shcore.SetProcessDpiAwareness(2) # 2 = Per Monitor DPI Aware
+except Exception:
+    try:
+        # Fallback for older Windows versions
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
+
+# Optional: Prevents Pygame from messing with the window if you click away
+os.environ['SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS'] = '0'
+# -------------------------------------------------------------
+
 import pygame
 import random
 from enum import Enum
@@ -24,11 +42,11 @@ BLUE1 = (0, 0, 255)
 BLUE2 = (0, 100, 255)
 BLACK = (0,0,0)
 
-BLOCK_SIZE = 20
-SPEED = 40 #20
+BLOCK_SIZE = 40
+SPEED = 60 #20
 
 class SnakeGameAi:
-    def __init__(self, w=640, h=480):
+    def __init__(self, w=1280, h=960):
         self.w = w
         self.h = h
         

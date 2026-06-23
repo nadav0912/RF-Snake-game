@@ -78,7 +78,8 @@ class Agent:
             mini_sample = self.memory
 
         states, actions, rewards, next_states, dones = zip(*mini_sample)
-        self.trainer.train_step(states, actions, rewards, next_states, dones)
+        loss = self.trainer.train_step(states, actions, rewards, next_states, dones)
+        return loss
 
     def train_short_memory(self, state, action, reward, next_state, done):
         self.trainer.train_step(state, action, reward, next_state, done)
@@ -102,8 +103,8 @@ class Agent:
 
 def train():
     plot_scores = []
-    plot_mean_score = []
-    total_score = 0
+    plot_mean_last_50_scores = []
+    plot_loss = []
     record = 0
     agent = Agent()
     game = SnakeGameAi()
@@ -129,19 +130,19 @@ def train():
         if done:
             game.reset()
             agent.num_games += 1
-            agent.train_long_memory()
+            loss = agent.train_long_memory()
 
             if score > record:
                 record = score
-                # agent.model.save()
+                agent.model.save()
 
             print(f"Gane: {agent.num_games}, score: {score}, record: {record}")
             
+            plot_loss.append(loss)
             plot_scores.append(score)
-            total_score += score
-            mean_score = total_score / agent.num_games
-            plot_mean_score.append(mean_score)
-            plot(plot_scores, plot_mean_score)
+            last_50_scores = plot_scores[-50:]
+            plot_mean_last_50_scores.append(sum(last_50_scores) / len(last_50_scores))
+            plot(plot_scores, plot_mean_last_50_scores, plot_loss)
 
 
 if __name__ == '__main__':
