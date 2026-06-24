@@ -83,21 +83,23 @@ class SnakeGameAi:
                 quit()
 
         # Dist from the apple before move
-        dist_before = math.sqrt((self.head.x - self.food.x)**2 + (self.head.y - self.food.y)**2)
+        #dist_before = math.sqrt((self.head.x - self.food.x)**2 + (self.head.y - self.food.y)**2)
         
         # 2. move
         self._move(action) # update the head
         self.snake.insert(0, self.head)
 
         # Dist from the apple after move
-        dist_after = math.sqrt((self.head.x - self.food.x)**2 + (self.head.y - self.food.y)**2)
+        #dist_after = math.sqrt((self.head.x - self.food.x)**2 + (self.head.y - self.food.y)**2)
         
         # 3. Small reward on move away/move closer to the apple
-        reward = 0
+        reward = -0.01
+        """
         if dist_after < dist_before:
             reward = 0.1  
         else:
             reward = -0.1 
+        """
 
         # 4. check if game over
         game_over = False
@@ -160,23 +162,6 @@ class SnakeGameAi:
         pygame.display.flip()
         
     def _move(self, action):
-        """
-        # action -> [straight, right, left] (boolian values)
-
-        clock_wise = [Direction.RIGHT, Direction.DOWN, Direction.LEFT, Direction.UP]
-        idx = clock_wise.index(self.direction)
-
-        if np.array_equal(action, [1, 0, 0]):
-            new_dir = clock_wise[idx] # no change
-        elif np.array_equal(action, [0, 1, 0]):
-            next_idx = (idx + 1) % 4
-            new_dir = clock_wise[next_idx] # right turn: right -> down -> left -> up -> right
-        else: # [0, 0, 1]
-            next_idx = (idx - 1) % 4
-            new_dir = clock_wise[next_idx] # left turn: right -> up -> left -> down -> right 
-
-        self.direction = new_dir
-        """
         # action -> [UP, RIGHT, DOWN, LEFT]
 
         if np.array_equal(action, [1, 0, 0, 0]):

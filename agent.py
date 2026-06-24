@@ -58,7 +58,17 @@ class Agent:
         # Set food channel
         food_x, food_y = get_idx(game.food)
         if 0 <= food_x < cols and 0 <= food_y < rows:
-            state[2, food_y + 1, food_x + 1] = 1
+            apple_y, apple_x = food_y + 1, food_x + 1
+            
+            # Create heat map with the apple as the center 
+            # close to the center -> value close to 1, far from the center value decrese and get close to 0
+            y_grid, x_grid = np.ogrid[:rows+2, :cols+2]
+            dist_matrix = np.abs(y_grid - apple_y) + np.abs(x_grid - apple_x)
+            max_dist = float(max(rows, cols))
+            heatmap = np.maximum(0.0, 1.0 - (dist_matrix / max_dist))
+            state[2, :, :] = heatmap
+        else:
+            raise ValueError("Apple not in screen border")
 
         # Set all values in 4 channel by the snake current direction 
         dir_map = {Direction.UP: -1.0, Direction.RIGHT: -0.33, Direction.DOWN: 0.33, Direction.LEFT: 1.0}
@@ -85,10 +95,10 @@ class Agent:
         
     def get_action(self, state, game: SnakeGameAi):
         # Random moves - tradeoff exploration / exploition
-        if self.num_games > 2000:
+        if self.num_games > 4000:
             self.epsilon = 0.0
         else:
-            self.epsilon = max(0.02, 1.0 - (self.num_games / 1500))        
+            self.epsilon = max(0.02, 1.0 - (self.num_games / 2000))        
        
         final_move = [0, 0, 0, 0]
         if random.random() < self.epsilon:
@@ -117,7 +127,7 @@ def train():
     plot_mean_last_50_scores = []
     plot_loss = []
     record = 0
-    agent = Agent()
+    agent = Agent(start_over=True)
     game = SnakeGameAi()
 
     while True:
