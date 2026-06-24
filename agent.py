@@ -32,7 +32,7 @@ class Agent:
 
         self.trainer = QTrainer(self.model, self.target_model, lr=LR, gamma=self.gamma)
 
-    def get_state(self, game: SnakeGameAi):
+    def get_image_state(self, game: SnakeGameAi):
         cols = int(game.w // BLOCK_SIZE)
         rows = int(game.h // BLOCK_SIZE)
 
@@ -76,6 +76,37 @@ class Agent:
 
         return state
     
+    def get_logic_state(self, game: SnakeGameAi):
+        head = game.head
+        
+        # Calc 4 point around the snake head
+        point_u = Point(head.x, head.y - BLOCK_SIZE)
+        point_r = Point(head.x + BLOCK_SIZE, head.y)
+        point_d = Point(head.x, head.y + BLOCK_SIZE)
+        point_l = Point(head.x - BLOCK_SIZE, head.y)
+        
+        state = [
+            # Danger around the head
+            game.is_collision(point_u),
+            game.is_collision(point_r),
+            game.is_collision(point_d),
+            game.is_collision(point_l),
+            
+            # Current snake direction
+            game.direction == Direction.UP,
+            game.direction == Direction.RIGHT,
+            game.direction == Direction.DOWN,
+            game.direction == Direction.LEFT,
+            
+            # The position of the apple in relation to the snake head
+            game.food.y < game.head.y,  # up
+            game.food.x > game.head.x,  # right
+            game.food.y > game.head.y,  # down
+            game.food.x < game.head.x   # left
+        ]
+        
+        return np.array(state, dtype=np.float32)
+
     def remember(self, state, action, reward, next_state, done):
         # Pop left if MAX_MEMORY is reached
         self.memory.append((state, action, reward, next_state, done))

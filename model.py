@@ -8,7 +8,7 @@ import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Conv_QNet(nn.Module):
-    def __init__(self, input_shape, output_size):
+    def __init__(self, input_shape, input_logic_size, output_size):
         """
         input_shape: tuple of (Channels, Height, Width), e.g., (4, 32, 24)
         output_size: int, number of actions (e.g., 3)
@@ -42,7 +42,7 @@ class Conv_QNet(nn.Module):
         flattened_size = self._get_conv_output(dummy_input)
 
         self.linear_layers = nn.Sequential(
-            nn.Linear(flattened_size, 256),
+            nn.Linear(flattened_size + input_logic_size, 256),
             nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU(),
@@ -63,12 +63,15 @@ class Conv_QNet(nn.Module):
         x = self.conv_layers(x)
         return int(torch.prod(torch.tensor(x.size())))
 
-    def forward(self, x):
-        x = self.conv_layers(x)
+    def forward(self, x_img, x_logic):
+        x = self.conv_layers(x_img)
         
         # Flatten and keep the batches
         x = x.view(x.size(0), -1) 
         
+        # Combining conv output with x_logic to one tensor
+        x = torch.cat((x, x_logic), dim=1)
+
         x = self.linear_layers(x)
         return x
         
@@ -99,30 +102,34 @@ class QTrainer:
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
         self.loss_func = nn.SmoothL1Loss()
 
-    def train_step(self, state, action, reward, next_state, done):
+    def train_step(self, state_img, state_logic, action, reward, next_state_img, next_state_logic, done):
         """
         The parameters can be one list/number each parameter or each paramter can be a tuple of lists/values
         """
 
         # single value/list parameters -> 1 dim tensors, tuple paramters -> 2 dim tensors
-        state = torch.tensor(np.array(state), dtype=torch.float).to(device)
-        next_state = torch.tensor(np.array(next_state), dtype=torch.float).to(device)
+        state_img = torch.tensor(np.array(state_img), dtype=torch.float).to(device)
+        state_logic = torch.tensor(np.array(state_logic), dtype=torch.float).to(device)
+        next_state_img = torch.tensor(np.array(next_state_img), dtype=torch.float).to(device)
+        next_state_logic = torch.tensor(np.array(next_state_logic), dtype=torch.float).to(device)
         action = torch.tensor(np.array(action), dtype=torch.float).to(device)
         reward = torch.tensor(np.array(reward), dtype=torch.float).to(device)
 
-        if len(state.shape) == 3:
-            state = torch.unsqueeze(state, 0)
-            next_state = torch.unsqueeze(next_state, 0)
+        if len(state_img.shape) == 3:
+            state_img = torch.unsqueeze(state_img, 0)
+            state_logic = torch.unsqueeze(state_logic, 0)
+            next_state_img = torch.unsqueeze(next_state_img, 0)
+            next_state_logic = torch.unsqueeze(next_state_logic, 0)
             action = torch.unsqueeze(action, 0)
             reward = torch.unsqueeze(reward, 0)
             done = (done, )
 
         # 1: pedicted Q values with current state
-        pred = self.model(state)
+        pred = self.model(state_img, state_logic)
 
         # Predicted the reward on next state of every state
         with torch.no_grad():
-            next_preds = self.target_model(next_state)
+            next_preds = self.target_model(next_state_img, next_state_logic)
 
         target = pred.clone().detach()
         for idx in range(len(done)):
