@@ -8,18 +8,22 @@ from helper import plot
 
 MAX_MEMORY = 100_000 
 BATCH_SIZE = 256
-LR = 0.00035
+LR = 0.0001
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Agent:
-    def __init__(self):
+    def __init__(self, start_over=True):
         self.num_games = 0
         self.epsilon = 0  # controll randomness
         self.gamma = 0.9  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # create queue 
 
         self.model = Conv_QNet((4, 24+2, 32+2), 4).to(device)
+
+        if not start_over:
+            self.model.load()
+            self.num_games = 1200
 
         # Target model with whights of the model and in eval mode
         self.target_model = Conv_QNet((4, 26, 34), 4).to(device)
@@ -144,13 +148,8 @@ def train():
                 agent.model.save()
 
             # Target Network Synchronization every 50 games
-            if agent.num_games % 10 == 0:
+            if agent.num_games % 35 == 0:
                 agent.target_model.load_state_dict(agent.model.state_dict())
-
-            # Rreduce LR in 5% every 100 games
-            if agent.num_games % 100 == 0:
-                for param_group in agent.trainer.optimizer.param_groups:
-                    param_group['lr'] = max(param_group['lr'] * 0.95, 0.00001)
 
             print(f"Game: {agent.num_games}, score: {score}, record: {record}")
             

@@ -15,6 +15,8 @@ class Conv_QNet(nn.Module):
         """
         super().__init__()
 
+        self.model_folder_path = './model'
+
         self.conv_layers = nn.Sequential(
             nn.Conv2d(
                 in_channels=input_shape[0],
@@ -42,7 +44,9 @@ class Conv_QNet(nn.Module):
         self.linear_layers = nn.Sequential(
             nn.Linear(flattened_size, 256),
             nn.ReLU(),
-            nn.Linear(256, output_size)
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, output_size)
         )
 
         # Smart weight initialization
@@ -69,12 +73,20 @@ class Conv_QNet(nn.Module):
         return x
         
     def save(self, file_name='model.pth'):
-        model_folder_path = './model'
-        if not os.path.exists(model_folder_path):
-            os.makedirs(model_folder_path)
+        if not os.path.exists(self.model_folder_path):
+            os.makedirs(self.model_folder_path)
 
-        file_name = os.path.join(model_folder_path, file_name)
+        file_name = os.path.join(self.model_folder_path, file_name)
         torch.save(self.state_dict(), file_name)
+
+    def load(self, file_name='model.pth'):
+        file_path = os.path.join(self.model_folder_path, file_name)
+        
+        if os.path.exists(file_path):
+            self.load_state_dict(torch.load(file_path))
+            print(f"Model successfully loaded from {file_path}")
+        else:
+            print("No saved model found, starting fresh.")
 
 
 class QTrainer:

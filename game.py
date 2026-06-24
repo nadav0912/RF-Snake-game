@@ -44,7 +44,7 @@ BLUE2 = (0, 100, 255)
 BLACK = (0,0,0)
 
 BLOCK_SIZE = 40 # for (32, 24) board
-SPEED = 125 #75
+SPEED = 175 #75
 
 class SnakeGameAi:
     def __init__(self, w=1280, h=960):
