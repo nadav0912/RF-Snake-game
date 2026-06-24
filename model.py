@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import numpy as np
 import os
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -18,7 +19,7 @@ class Conv_QNet(nn.Module):
             nn.Conv2d(
                 in_channels=input_shape[0],
                 out_channels=32,
-                kernel_size=5,
+                kernel_size=3,
                 stride=1,
                 padding=0
             ),
@@ -92,10 +93,10 @@ class QTrainer:
         """
 
         # single value/list parameters -> 1 dim tensors, tuple paramters -> 2 dim tensors
-        state = torch.tensor(state, dtype=torch.float).to(device)
-        next_state = torch.tensor(next_state, dtype=torch.float).to(device)
-        action = torch.tensor(action, dtype=torch.float).to(device)
-        reward = torch.tensor(reward, dtype=torch.float).to(device)
+        state = torch.tensor(np.array(state), dtype=torch.float).to(device)
+        next_state = torch.tensor(np.array(next_state), dtype=torch.float).to(device)
+        action = torch.tensor(np.array(action), dtype=torch.float).to(device)
+        reward = torch.tensor(np.array(reward), dtype=torch.float).to(device)
 
         if len(state.shape) == 3:
             state = torch.unsqueeze(state, 0)
@@ -111,7 +112,7 @@ class QTrainer:
         with torch.no_grad():
             next_preds = self.target_model(next_state)
 
-        target = pred.clone()
+        target = pred.clone().detach()
         for idx in range(len(done)):
             # If done, onlt set Q_new to R (current reward)
             Q_new = reward[idx]

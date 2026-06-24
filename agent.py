@@ -7,8 +7,8 @@ from model import Conv_QNet, QTrainer
 from helper import plot
 
 MAX_MEMORY = 100_000 
-BATCH_SIZE = 64
-LR = 0.00025
+BATCH_SIZE = 256
+LR = 0.00035
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -19,29 +19,27 @@ class Agent:
         self.gamma = 0.9  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # create queue 
 
-        self.model = Conv_QNet((3, 24+2, 32+2), 4).to(device)
+        self.model = Conv_QNet((4, 24+2, 32+2), 4).to(device)
 
         # Target model with whights of the model and in eval mode
-        self.target_model = Conv_QNet((3, 26, 34), 4).to(device)
+        self.target_model = Conv_QNet((4, 26, 34), 4).to(device)
         self.target_model.load_state_dict(self.model.state_dict())
         self.target_model.eval()
 
         self.trainer = QTrainer(self.model, self.target_model, lr=LR, gamma=self.gamma)
-
 
     def get_state(self, game: SnakeGameAi):
         cols = int(game.w // BLOCK_SIZE)
         rows = int(game.h // BLOCK_SIZE)
 
         # Create state with 4 channels: 0 -> head, 1 -> snake body, 2 -> apple, 3 -> direction
-        state = np.zeros((3, rows+2, cols+2), dtype=int)
+        state = np.zeros((4, rows+2, cols+2), dtype=int)
 
         # Set border of ones
         state[1, 0, :] = 1          # seiling
         state[1, -1, :] = 1         # floor
         state[1, :, 0] = 1          # left wall
         state[1, :, -1] = 1         # right wall
-
 
         # Set head in first channel
         head_x, head_y = get_idx(game.snake[0])
@@ -58,11 +56,9 @@ class Agent:
         if 0 <= food_x < cols and 0 <= food_y < rows:
             state[2, food_y + 1, food_x + 1] = 1
 
-        """
         # Set all values in 4 channel by the snake current direction 
-        dir_map = {Direction.UP: 1, Direction.RIGHT: 2, Direction.DOWN: 3, Direction.LEFT: 4}
+        dir_map = {Direction.UP: -1.0, Direction.RIGHT: -0.33, Direction.DOWN: 0.33, Direction.LEFT: 1.0}
         state[3, :, :] = dir_map[game.direction]
-        """
 
         return state
     
@@ -83,26 +79,24 @@ class Agent:
     def train_short_memory(self, state, action, reward, next_state, done):
         self.trainer.train_step(state, action, reward, next_state, done)
         
-    def get_action(self, state):
+    def get_action(self, state, game: SnakeGameAi):
         # Random moves - tradeoff exploration / exploition
-        self.epsilon = 0 if self.num_games > 2000 else max(20, 1000 - self.num_games) # more games -> smaller epsilon
-        
-        """
-        final_move = [0, 0, 0]
-        if random.randint(0, 300) < self.epsilon:
-            idx_move = random.randint(0, 2)
-            final_move[idx_move] = 1
+        if self.num_games > 2000:
+            self.epsilon = 0.0
         else:
-            state0 = torch.tensor(state, dtype=torch.float)
-            state0 = torch.unsqueeze(state0, 0).to(device)
-            prediction = self.model(state0)
-            idx_move = torch.argmax(prediction).item()
-            final_move[idx_move] = 1
-        """
-
+            self.epsilon = max(0.02, 1.0 - (self.num_games / 1500))        
+       
         final_move = [0, 0, 0, 0]
-        if random.randint(0, 1200) < self.epsilon:
-            idx_move = random.randint(0, 3)
+        if random.random() < self.epsilon:
+            # Remove the opsite direction move to prevent him make a invalid move
+            possible_moves = [0, 1, 2, 3]
+            current_direction = game.direction
+            if current_direction == Direction.UP: possible_moves.remove(2)
+            elif current_direction == Direction.RIGHT: possible_moves.remove(3)
+            elif current_direction == Direction.DOWN: possible_moves.remove(0)
+            elif current_direction == Direction.LEFT: possible_moves.remove(1)
+
+            idx_move = random.choice(possible_moves)
             final_move[idx_move] = 1
         else:
             state0 = torch.tensor(np.array(state), dtype=torch.float)
@@ -127,7 +121,7 @@ def train():
         state_old = agent.get_state(game)
 
         # get move
-        final_move = agent.get_action(state_old)
+        final_move = agent.get_action(state_old, game)
 
         # perform move and get new state
         reward, done, score = game.play_step(final_move)
@@ -149,9 +143,14 @@ def train():
                 record = score
                 agent.model.save()
 
-            # Target Network Synchronization every 10 games
+            # Target Network Synchronization every 50 games
             if agent.num_games % 10 == 0:
                 agent.target_model.load_state_dict(agent.model.state_dict())
+
+            # Rreduce LR in 5% every 100 games
+            if agent.num_games % 100 == 0:
+                for param_group in agent.trainer.optimizer.param_groups:
+                    param_group['lr'] = max(param_group['lr'] * 0.95, 0.00001)
 
             print(f"Game: {agent.num_games}, score: {score}, record: {record}")
             
