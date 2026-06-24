@@ -20,7 +20,7 @@ class Conv_QNet(nn.Module):
                 out_channels=32,
                 kernel_size=5,
                 stride=1,
-                padding=1
+                padding=0
             ),
             nn.ReLU(),
             nn.MaxPool2d(2, 2),
@@ -43,6 +43,15 @@ class Conv_QNet(nn.Module):
             nn.ReLU(),
             nn.Linear(256, output_size)
         )
+
+        # Smart weight initialization
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                # Kaiming Normal - excellent for Conv layers using ReLU
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.Linear):
+                # Xavier Normal - classic and stable for Linear layers
+                nn.init.xavier_normal_(m.weight)
 
     def _get_conv_output(self, x):
         """Helper func to find conv output tensor size"""
@@ -68,10 +77,11 @@ class Conv_QNet(nn.Module):
 
 
 class QTrainer:
-    def __init__(self, model, lr, gamma):
+    def __init__(self, model, target_model, lr, gamma):
         self.lr = lr
         self.gamma = gamma
         self.model = model
+        self.target_model = target_model
 
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
         self.loss_func = nn.SmoothL1Loss()
@@ -98,7 +108,8 @@ class QTrainer:
         pred = self.model(state)
 
         # Predicted the reward on next state of every state
-        next_preds = self.model(next_state)
+        with torch.no_grad():
+            next_preds = self.target_model(next_state)
 
         target = pred.clone()
         for idx in range(len(done)):

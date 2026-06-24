@@ -18,10 +18,16 @@ class Agent:
         self.epsilon = 0  # controll randomness
         self.gamma = 0.9  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # create queue 
-        print(f"Memory size: {len(self.memory)}")
 
         self.model = Conv_QNet((3, 24+2, 32+2), 4).to(device)
-        self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
+
+        # Target model with whights of the model and in eval mode
+        self.target_model = Conv_QNet((3, 26, 34), 4).to(device)
+        self.target_model.load_state_dict(self.model.state_dict())
+        self.target_model.eval()
+
+        self.trainer = QTrainer(self.model, self.target_model, lr=LR, gamma=self.gamma)
+
 
     def get_state(self, game: SnakeGameAi):
         cols = int(game.w // BLOCK_SIZE)
@@ -143,7 +149,11 @@ def train():
                 record = score
                 agent.model.save()
 
-            print(f"Gane: {agent.num_games}, score: {score}, record: {record}")
+            # Target Network Synchronization every 10 games
+            if agent.num_games % 10 == 0:
+                agent.target_model.load_state_dict(agent.model.state_dict())
+
+            print(f"Game: {agent.num_games}, score: {score}, record: {record}")
             
             plot_loss.append(loss)
             plot_scores.append(score)
