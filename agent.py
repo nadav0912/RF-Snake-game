@@ -7,8 +7,10 @@ from model import Conv_QNet, QTrainer
 from helper import plot
 
 MAX_MEMORY = 100_000 
-BATCH_SIZE = 1000
-LR = 0.001
+BATCH_SIZE = 64
+LR = 0.00025
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Agent:
     def __init__(self):
@@ -16,31 +18,45 @@ class Agent:
         self.epsilon = 0  # controll randomness
         self.gamma = 0.9  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # create queue 
+        print(f"Memory size: {len(self.memory)}")
 
-        self.model = Conv_QNet((3, 24, 32), 3)
+        self.model = Conv_QNet((3, 24+2, 32+2), 4).to(device)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def get_state(self, game: SnakeGameAi):
         cols = int(game.w // BLOCK_SIZE)
         rows = int(game.h // BLOCK_SIZE)
 
-        # Create state with 3 channels: 0 -> head, 1 -> snake body, 2 -> apple
-        state = np.zeros((3, rows, cols), dtype=int)
+        # Create state with 4 channels: 0 -> head, 1 -> snake body, 2 -> apple, 3 -> direction
+        state = np.zeros((3, rows+2, cols+2), dtype=int)
+
+        # Set border of ones
+        state[1, 0, :] = 1          # seiling
+        state[1, -1, :] = 1         # floor
+        state[1, :, 0] = 1          # left wall
+        state[1, :, -1] = 1         # right wall
+
 
         # Set head in first channel
         head_x, head_y = get_idx(game.snake[0])
         if 0 <= head_x < cols and 0 <= head_y < rows:
-            state[0, head_y, head_x] = 1
+            state[0, head_y + 1, head_x + 1] = 1
 
         # Set snake body channel
         for point in game.snake[1:]:
             bx, by = get_idx(point)
-            state[1, by, bx] = 1
+            state[1, by + 1, bx + 1] = 1
 
-        # Set 
+        # Set food channel
         food_x, food_y = get_idx(game.food)
         if 0 <= food_x < cols and 0 <= food_y < rows:
-            state[2, food_y, food_x] = 1
+            state[2, food_y + 1, food_x + 1] = 1
+
+        """
+        # Set all values in 4 channel by the snake current direction 
+        dir_map = {Direction.UP: 1, Direction.RIGHT: 2, Direction.DOWN: 3, Direction.LEFT: 4}
+        state[3, :, :] = dir_map[game.direction]
+        """
 
         return state
     
@@ -63,15 +79,28 @@ class Agent:
         
     def get_action(self, state):
         # Random moves - tradeoff exploration / exploition
-        self.epsilon = 80 - self.num_games # more games -> smaller epsilon
-
+        self.epsilon = 0 if self.num_games > 2000 else max(20, 1000 - self.num_games) # more games -> smaller epsilon
+        
+        """
         final_move = [0, 0, 0]
-        if random.randint(0, 200) < self.epsilon:
+        if random.randint(0, 300) < self.epsilon:
             idx_move = random.randint(0, 2)
             final_move[idx_move] = 1
         else:
             state0 = torch.tensor(state, dtype=torch.float)
-            state0 = torch.unsqueeze(state0, 0)
+            state0 = torch.unsqueeze(state0, 0).to(device)
+            prediction = self.model(state0)
+            idx_move = torch.argmax(prediction).item()
+            final_move[idx_move] = 1
+        """
+
+        final_move = [0, 0, 0, 0]
+        if random.randint(0, 1200) < self.epsilon:
+            idx_move = random.randint(0, 3)
+            final_move[idx_move] = 1
+        else:
+            state0 = torch.tensor(np.array(state), dtype=torch.float)
+            state0 = torch.unsqueeze(state0, 0).to(device)
             prediction = self.model(state0)
             idx_move = torch.argmax(prediction).item()
             final_move[idx_move] = 1

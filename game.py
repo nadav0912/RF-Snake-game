@@ -1,5 +1,6 @@
 import ctypes
 import os
+import math
 
 # --- Windows DPI Fix (Must be at the very top of the file) ---
 try:
@@ -43,7 +44,7 @@ BLUE2 = (0, 100, 255)
 BLACK = (0,0,0)
 
 BLOCK_SIZE = 40 # for (32, 24) board
-SPEED = 60 #20
+SPEED = 125 #75
 
 class SnakeGameAi:
     def __init__(self, w=1280, h=960):
@@ -80,20 +81,32 @@ class SnakeGameAi:
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
+
+        # Dist from the apple before move
+        dist_before = math.sqrt((self.head.x - self.food.x)**2 + (self.head.y - self.food.y)**2)
         
         # 2. move
         self._move(action) # update the head
         self.snake.insert(0, self.head)
+
+        # Dist from the apple after move
+        dist_after = math.sqrt((self.head.x - self.food.x)**2 + (self.head.y - self.food.y)**2)
         
-        # 3. check if game over
+        # 3. Small reward on move away/move closer to the apple
         reward = 0
+        if dist_after < dist_before:
+            reward = 0.3  
+        else:
+            reward = -0.3 
+
+        # 4. check if game over
         game_over = False
         if self.is_collision() or self.frame_iteration > 100*len(self.snake):
             game_over = True
             reward = -10
             return reward, game_over, self.score
             
-        # 4. place new food or just move
+        # 5. place new food or just move
         if self.head == self.food:
             self.score += 1
             reward = 10
@@ -101,11 +114,11 @@ class SnakeGameAi:
         else:
             self.snake.pop()
         
-        # 5. update ui and clock
+        # 6. update ui and clock
         self._update_ui()
         self.clock.tick(SPEED)
         
-        # 6. return game over and score
+        # 7. return game over and score
         return reward, game_over, self.score
     
     def _place_food(self):
@@ -147,6 +160,7 @@ class SnakeGameAi:
         pygame.display.flip()
         
     def _move(self, action):
+        """
         # action -> [straight, right, left] (boolian values)
 
         clock_wise = [Direction.RIGHT, Direction.DOWN, Direction.LEFT, Direction.UP]
@@ -162,6 +176,21 @@ class SnakeGameAi:
             new_dir = clock_wise[next_idx] # left turn: right -> up -> left -> down -> right 
 
         self.direction = new_dir
+        """
+        # action -> [UP, RIGHT, DOWN, LEFT]
+
+        if np.array_equal(action, [1, 0, 0, 0]):
+            if self.direction != Direction.DOWN:
+                self.direction = Direction.UP
+        elif np.array_equal(action, [0, 1, 0, 0]):
+            if self.direction != Direction.LEFT:
+                self.direction = Direction.RIGHT
+        elif np.array_equal(action, [0, 0, 1, 0]):
+            if self.direction != Direction.UP:
+                self.direction = Direction.DOWN
+        elif np.array_equal(action, [0, 0, 0, 1]):
+            if self.direction != Direction.RIGHT:
+                self.direction = Direction.LEFT
 
         x = self.head.x
         y = self.head.y

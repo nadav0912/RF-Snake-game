@@ -4,26 +4,29 @@ import torch.optim as optim
 import torch.nn.functional as F
 import os
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class Conv_QNet(nn.Module):
     def __init__(self, input_shape, output_size):
         """
-        input_shape: tuple of (Channels, Height, Width), e.g., (3, 32, 24)
+        input_shape: tuple of (Channels, Height, Width), e.g., (4, 32, 24)
         output_size: int, number of actions (e.g., 3)
         """
         super().__init__()
 
         self.conv_layers = nn.Sequential(
             nn.Conv2d(
-                in_channels=input_shape[0], # 3
-                out_channels=16,
-                kernel_size=3,
+                in_channels=input_shape[0],
+                out_channels=32,
+                kernel_size=5,
                 stride=1,
                 padding=1
             ),
             nn.ReLU(),
+            nn.MaxPool2d(2, 2),
             nn.Conv2d(
-                in_channels=16, 
-                out_channels=32, 
+                in_channels=32, 
+                out_channels=64, 
                 kernel_size=3, 
                 stride=1, 
                 padding=1
@@ -71,7 +74,7 @@ class QTrainer:
         self.model = model
 
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
-        self.loss_func = nn.MSELoss()
+        self.loss_func = nn.SmoothL1Loss()
 
     def train_step(self, state, action, reward, next_state, done):
         """
@@ -79,10 +82,10 @@ class QTrainer:
         """
 
         # single value/list parameters -> 1 dim tensors, tuple paramters -> 2 dim tensors
-        state = torch.tensor(state, dtype=torch.float)
-        next_state = torch.tensor(next_state, dtype=torch.float)
-        action = torch.tensor(action, dtype=torch.float)
-        reward = torch.tensor(reward, dtype=torch.float)
+        state = torch.tensor(state, dtype=torch.float).to(device)
+        next_state = torch.tensor(next_state, dtype=torch.float).to(device)
+        action = torch.tensor(action, dtype=torch.float).to(device)
+        reward = torch.tensor(reward, dtype=torch.float).to(device)
 
         if len(state.shape) == 3:
             state = torch.unsqueeze(state, 0)
@@ -106,7 +109,7 @@ class QTrainer:
             if not done[idx]:
                 Q_new = reward[idx] + self.gamma * torch.max(next_preds[idx])
 
-            target[idx][torch.argmax(action).item()] = Q_new
+            target[idx][torch.argmax(action[idx]).item()] = Q_new
 
 
         self.optimizer.zero_grad()
@@ -115,5 +118,3 @@ class QTrainer:
         self.optimizer.step()
 
         return loss.item()
-
-        
