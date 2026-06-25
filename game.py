@@ -83,27 +83,24 @@ class SnakeGameAi:
                 quit()
 
         # Dist from the apple before move
-        #dist_before = math.sqrt((self.head.x - self.food.x)**2 + (self.head.y - self.food.y)**2)
+        dist_before = math.sqrt((self.head.x - self.food.x)**2 + (self.head.y - self.food.y)**2)
         
         # 2. move
         self._move(action) # update the head
         self.snake.insert(0, self.head)
 
         # Dist from the apple after move
-        #dist_after = math.sqrt((self.head.x - self.food.x)**2 + (self.head.y - self.food.y)**2)
+        dist_after = math.sqrt((self.head.x - self.food.x)**2 + (self.head.y - self.food.y)**2)
         
         # 3. Small reward on move away/move closer to the apple
-        reward = -0.01
-        """
         if dist_after < dist_before:
             reward = 0.1  
         else:
-            reward = -0.1 
-        """
+            reward = -0.2
 
         # 4. check if game over
         game_over = False
-        if self.is_collision() or self.frame_iteration > 100*len(self.snake):
+        if self.is_collision() or self.frame_iteration > 150*len(self.snake):
             game_over = True
             reward = -10
             return reward, game_over, self.score

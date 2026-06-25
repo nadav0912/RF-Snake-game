@@ -41,10 +41,16 @@ class Conv_QNet(nn.Module):
         dummy_input = torch.zeros(1, *input_shape) # tensore with size (3, 32, 24)
         flattened_size = self._get_conv_output(dummy_input)
 
-        self.linear_layers = nn.Sequential(
-            nn.Linear(flattened_size + input_logic_size, 256),
+
+        self.cnn_compress = nn.Sequential(
+            nn.Linear(flattened_size, 512),
             nn.ReLU(),
-            nn.Linear(256, 128),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+        )
+
+        self.linear_layers = nn.Sequential(
+            nn.Linear(256 + input_logic_size, 128),
             nn.ReLU(),
             nn.Linear(128, output_size)
         )
@@ -68,6 +74,8 @@ class Conv_QNet(nn.Module):
         
         # Flatten and keep the batches
         x = x.view(x.size(0), -1) 
+
+        x = self.cnn_compress(x)
         
         # Combining conv output with x_logic to one tensor
         x = torch.cat((x, x_logic), dim=1)

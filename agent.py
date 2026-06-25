@@ -19,14 +19,14 @@ class Agent:
         self.gamma = 0.9  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # create queue 
 
-        self.model = Conv_QNet((4, 24+2, 32+2), 4).to(device)
+        self.model = Conv_QNet((3, 24+2, 32+2), 12, 4).to(device)
 
         if not start_over:
             self.model.load()
             self.num_games = 1200
 
         # Target model with whights of the model and in eval mode
-        self.target_model = Conv_QNet((4, 26, 34), 4).to(device)
+        self.target_model = Conv_QNet((3, 26, 34), 12, 4).to(device)
         self.target_model.load_state_dict(self.model.state_dict())
         self.target_model.eval()
 
@@ -36,8 +36,8 @@ class Agent:
         cols = int(game.w // BLOCK_SIZE)
         rows = int(game.h // BLOCK_SIZE)
 
-        # Create state with 4 channels: 0 -> head, 1 -> snake body, 2 -> apple, 3 -> direction
-        state = np.zeros((4, rows+2, cols+2), dtype=int)
+        # Create state with 3 channels: 0 -> head, 1 -> snake body and walls, 2 -> apple
+        state = np.zeros((3, rows+2, cols+2), dtype=np.float32)
 
         # Set border of ones
         state[1, 0, :] = 1          # seiling
@@ -69,10 +69,6 @@ class Agent:
             state[2, :, :] = heatmap
         else:
             raise ValueError("Apple not in screen border")
-
-        # Set all values in 4 channel by the snake current direction 
-        dir_map = {Direction.UP: -1.0, Direction.RIGHT: -0.33, Direction.DOWN: 0.33, Direction.LEFT: 1.0}
-        state[3, :, :] = dir_map[game.direction]
 
         return state
     
@@ -107,9 +103,9 @@ class Agent:
         
         return np.array(state, dtype=np.float32)
 
-    def remember(self, state, action, reward, next_state, done):
+    def remember(self, state_img, state_logic, action, reward, next_state_img, next_state_logic, done):
         # Pop left if MAX_MEMORY is reached
-        self.memory.append((state, action, reward, next_state, done))
+        self.memory.append((state_img, state_logic, action, reward, next_state_img, next_state_logic, done))
 
     def train_long_memory(self):
         if len(self.memory) > BATCH_SIZE:
@@ -117,19 +113,19 @@ class Agent:
         else:
             mini_sample = self.memory
 
-        states, actions, rewards, next_states, dones = zip(*mini_sample)
-        loss = self.trainer.train_step(states, actions, rewards, next_states, dones)
+        states_img, states_logic, actions, rewards, next_states_img, next_states_logic, dones = zip(*mini_sample)
+        loss = self.trainer.train_step(states_img, states_logic, actions, rewards, next_states_img, next_states_logic, dones)
         return loss
 
-    def train_short_memory(self, state, action, reward, next_state, done):
-        self.trainer.train_step(state, action, reward, next_state, done)
-        
-    def get_action(self, state, game: SnakeGameAi):
+    def train_short_memory(self, state_img, state_logic, action, reward, next_state_img, next_state_logic, done):
+        self.trainer.train_step(state_img, state_logic, action, reward, next_state_img, next_state_logic, done)
+   
+    def get_action(self, state_img, state_logic, game: SnakeGameAi):
         # Random moves - tradeoff exploration / exploition
-        if self.num_games > 4000:
+        if self.num_games > 3000:
             self.epsilon = 0.0
         else:
-            self.epsilon = max(0.02, 1.0 - (self.num_games / 2000))        
+            self.epsilon = max(0.02, 1.0 - (self.num_games / 1750))        
        
         final_move = [0, 0, 0, 0]
         if random.random() < self.epsilon:
@@ -144,9 +140,9 @@ class Agent:
             idx_move = random.choice(possible_moves)
             final_move[idx_move] = 1
         else:
-            state0 = torch.tensor(np.array(state), dtype=torch.float)
-            state0 = torch.unsqueeze(state0, 0).to(device)
-            prediction = self.model(state0)
+            state0_img = torch.tensor(np.array(state_img), dtype=torch.float).unsqueeze(0).to(device)
+            state0_logic = torch.tensor(np.array(state_logic), dtype=torch.float).unsqueeze(0).to(device)
+            prediction = self.model(state0_img, state0_logic)
             idx_move = torch.argmax(prediction).item()
             final_move[idx_move] = 1
 
@@ -163,20 +159,22 @@ def train():
 
     while True:
         # get old state
-        state_old = agent.get_state(game)
+        state_old_img = agent.get_image_state(game)
+        state_old_logic = agent.get_logic_state(game)
 
         # get move
-        final_move = agent.get_action(state_old, game)
+        final_move = agent.get_action(state_old_img, state_old_logic, game)
 
         # perform move and get new state
         reward, done, score = game.play_step(final_move)
-        state_new = agent.get_state(game)
+        state_new_img = agent.get_image_state(game)
+        state_new_logic = agent.get_logic_state(game)
 
         # train short memory
-        agent.train_short_memory(state_old, final_move, reward, state_new, done)
+        agent.train_short_memory(state_old_img, state_old_logic, final_move, reward, state_new_img, state_new_logic, done)
 
         # store in memory
-        agent.remember(state_old, final_move, reward, state_new, done)
+        agent.remember(state_old_img, state_old_logic, final_move, reward, state_new_img, state_new_logic, done)
 
         # train long memory, plot result
         if done:
