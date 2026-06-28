@@ -27,11 +27,22 @@ class Conv_QNet(nn.Module):
             ),
             nn.ReLU(),
             nn.MaxPool2d(2, 2),
+
             nn.Conv2d(
                 in_channels=32, 
                 out_channels=64, 
                 kernel_size=3, 
                 stride=1, 
+                padding=1
+            ),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=128,
+                kernel_size=3,
+                stride=1,
                 padding=1
             ),
             nn.ReLU()
@@ -41,16 +52,22 @@ class Conv_QNet(nn.Module):
         dummy_input = torch.zeros(1, *input_shape) # tensore with size (3, 32, 24)
         flattened_size = self._get_conv_output(dummy_input)
 
-
         self.cnn_compress = nn.Sequential(
-            nn.Linear(flattened_size, 512),
+            nn.Linear(flattened_size, 4096),
             nn.ReLU(),
-            nn.Linear(512, 256),
+            nn.Dropout(p=0.2),
+            nn.Linear(4096, 1024),
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.Linear(1024, 256),
             nn.ReLU(),
         )
 
         self.linear_layers = nn.Sequential(
-            nn.Linear(256 + input_logic_size, 128),
+            nn.Linear(256 + input_logic_size, 256),
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.Linear(256, 128),
             nn.ReLU(),
             nn.Linear(128, output_size)
         )
@@ -114,6 +131,8 @@ class QTrainer:
         """
         The parameters can be one list/number each parameter or each paramter can be a tuple of lists/values
         """
+
+        self.model.train()
 
         # single value/list parameters -> 1 dim tensors, tuple paramters -> 2 dim tensors
         state_img = torch.tensor(np.array(state_img), dtype=torch.float).to(device)

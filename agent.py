@@ -64,7 +64,7 @@ class Agent:
             # close to the center -> value close to 1, far from the center value decrese and get close to 0
             y_grid, x_grid = np.ogrid[:rows+2, :cols+2]
             dist_matrix = np.abs(y_grid - apple_y) + np.abs(x_grid - apple_x)
-            max_dist = float(max(rows, cols))
+            max_dist = float(rows + cols)
             heatmap = np.maximum(0.0, 1.0 - (dist_matrix / max_dist))
             state[2, :, :] = heatmap
         else:
@@ -122,7 +122,7 @@ class Agent:
    
     def get_action(self, state_img, state_logic, game: SnakeGameAi):
         # Random moves - tradeoff exploration / exploition
-        if self.num_games > 3000:
+        if self.num_games > 4000:
             self.epsilon = 0.0
         else:
             self.epsilon = max(0.02, 1.0 - (self.num_games / 1750))        
@@ -142,7 +142,22 @@ class Agent:
         else:
             state0_img = torch.tensor(np.array(state_img), dtype=torch.float).unsqueeze(0).to(device)
             state0_logic = torch.tensor(np.array(state_logic), dtype=torch.float).unsqueeze(0).to(device)
-            prediction = self.model(state0_img, state0_logic)
+            
+            self.model.eval()
+            with torch.no_grad():
+                prediction = self.model(state0_img, state0_logic)
+            self.model.train()
+
+            current_direction = game.direction
+            if current_direction == Direction.UP: 
+                prediction[0][2] = -float('inf')  # Block down
+            elif current_direction == Direction.RIGHT: 
+                prediction[0][3] = -float('inf')  # Block left
+            elif current_direction == Direction.DOWN: 
+                prediction[0][0] = -float('inf')  # Block up
+            elif current_direction == Direction.LEFT: 
+                prediction[0][1] = -float('inf')  # Block right
+            
             idx_move = torch.argmax(prediction).item()
             final_move[idx_move] = 1
 
