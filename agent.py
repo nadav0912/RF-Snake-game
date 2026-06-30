@@ -15,6 +15,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class Agent:
     def __init__(self, start_over=True):
         self.num_games = 0
+        self.n_steps = 0
         self.epsilon = 0  # controll randomness
         self.gamma = 0.9  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # create queue 
@@ -122,10 +123,10 @@ class Agent:
    
     def get_action(self, state_img, state_logic, game: SnakeGameAi):
         # Random moves - tradeoff exploration / exploition
-        if self.num_games > 4000:
+        if self.num_games > 5000:
             self.epsilon = 0.0
         else:
-            self.epsilon = max(0.02, 1.0 - (self.num_games / 1750))        
+            self.epsilon = max(0.02, 1.0 - (self.num_games / 4000))        
        
         final_move = [0, 0, 0, 0]
         if random.random() < self.epsilon:
@@ -182,6 +183,8 @@ def train():
 
         # perform move and get new state
         reward, done, score = game.play_step(final_move)
+        agent.n_steps += 1
+
         state_new_img = agent.get_image_state(game)
         state_new_logic = agent.get_logic_state(game)
 
@@ -190,6 +193,10 @@ def train():
 
         # store in memory
         agent.remember(state_old_img, state_old_logic, final_move, reward, state_new_img, state_new_logic, done)
+
+        # Target Network Synchronization every 1000 snake steps
+        if agent.n_steps % 1000 == 0:
+            agent.target_model.load_state_dict(agent.model.state_dict())
 
         # train long memory, plot result
         if done:
@@ -200,10 +207,6 @@ def train():
             if score > record:
                 record = score
                 agent.model.save()
-
-            # Target Network Synchronization every 50 games
-            if agent.num_games % 35 == 0:
-                agent.target_model.load_state_dict(agent.model.state_dict())
 
             print(f"Game: {agent.num_games}, score: {score}, record: {record}")
             
