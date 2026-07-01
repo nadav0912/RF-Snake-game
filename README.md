@@ -1,5 +1,21 @@
 # 🐍 RF Autonomous Snake Agent
 
+![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
+![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=flat&logo=PyTorch&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![100% Human](https://img.shields.io/badge/100%25-Human_Made-FF69B4.svg)
+
+> This project was developed as part of a Deep Learning course for a B.Sc. in Computer Science.
+
+## 📑 Table of Contents
+- [Project Overview](#-project-overview)
+- [Gameplay Comparison](#-gameplay-comparison)
+- [Architecture & Technical Deep Dive](#-architecture--technical-deep-dive-v2-model)
+- [Results & Comparative Analysis](#-results--comparative-analysis)
+- [Limitations & Future Work](#%EF%B8%8F-limitations--future-work)
+- [Installation & Usage](#%EF%B8%8F-installation--usage)
+- [Repository Structure](#-repository-structure)
+
 ## 📌 Project Overview
 This repository chronicles the evolution of a Reinforcement Learning (RL) agent trained to master the classic game of Snake. 
 
@@ -64,14 +80,18 @@ The training data highlights the clear trade-off between model complexity and th
     <th width="50%">V1 Training (Linear DQN)</th>
   </tr>
   <tr>
-    <td align="center"><img src="visualizations/Training_Dashboard_v2.png" alt="V2 Training Graph" width="100%"/></td>
+    <td align="center"><img src="visualizations/v3_part1.png" alt="V2 Training Graph" width="100%"/></td>
     <td align="center"><img src="visualizations/Training_Dashboard_v1.png" alt="V1 Training Graph" width="100%"/></td>
   </tr>
-  <tr>
-    <td><b>Slower to learn, higher ceiling.</b> Processing a full visual state requires significantly more training time (~6,000 games). However, it stabilizes at a high moving average (~33.3) with peak scores exceeding 80. The loss converges beautifully.</td>
+    <td><b>Slower to learn, higher ceiling.</b> Processing a full visual state requires significantly more training time. The graph demonstrates the model stabilizing at a moving average of <b>~30.4</b> with peak scores exceeding 80. The loss converges beautifully.<br><br><b>Note:</b> Continued training from this exact point (with a lowered Learning Rate and adjusted rewards) further pushed the moving average to <b>~35</b> and peak scores to nearly 90.</td>
     <td><b>Fast to learn, low ceiling.</b> The lightweight model learns quickly but hits a strict plateau after just a few hundred games. It caps at a moving average of ~19.7 and a peak score of 50.</td>
   </tr>
 </table>
+
+---
+
+### ⚠️ Limitations & Future Work
+While the V2 agent successfully overcomes the baseline's short-sightedness and learns to intelligently avoid its own growing body, it does not achieve perfect gameplay. In highly complex, late-game scenarios where the board is heavily constrained, the immense geometric complexity still occasionally traps the agent. Future iterations could explore self-attention mechanisms or more advanced spatial reward shaping to solve these final edge cases.
 
 ---
 
@@ -88,7 +108,7 @@ Make sure your `requirements.txt` includes the following core libraries:
 ### Setup
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/nadav0912/RF-Snake-game.git](https://github.com/nadav0912/RF-Snake-game.git)
+   git clone https://github.com/nadav0912/RF-Snake-game.git
    cd RF-Snake-game
    ```
 
@@ -97,10 +117,10 @@ Make sure your `requirements.txt` includes the following core libraries:
    pip install -r requirements.txt
    ```
 
-4. Running the Agent - 
+3. Running the Agent - 
    To start the training process and watch the AI learn in real-time:
    ```bash
-   python agent.py
+   python src/agent.py
    ```
 
 ---
